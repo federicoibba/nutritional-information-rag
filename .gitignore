@@ -1,0 +1,9 @@
+# Mac Files
+.DS_Store
+
+# Environment variables
+.env
+
+# Notebook files
+.ipynb_checkpoints
+calories_vectorstore
