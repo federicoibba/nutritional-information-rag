@@ -1,4 +1,4 @@
 # Nutritional Information RAG
 
 ## Dataset
-Link for download: https://www.kaggle.com/datasets/openfoodfacts/world-food-facts/data
+Link for download: https://www.kaggle.com/datasets/shrutisaxena/food-nutrition-dataset
