@@ -7,3 +7,6 @@
 # Notebook files
 .ipynb_checkpoints
 calories_vectorstore
+
+# Python cache files
+__pycache__/
