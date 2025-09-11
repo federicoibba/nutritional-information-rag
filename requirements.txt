@@ -1,0 +1,10 @@
+pandas
+jupyterlab
+huggingface_hub
+tqdm
+langchain
+sentence-transformers
+pymongo
+openai
+transformers
+python-dotenv
