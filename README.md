@@ -27,8 +27,6 @@ The dataset used can be downloaded from Kaggle: [Food Nutrition Dataset](https:/
 The service is deployed online using [modal.com](https://modal.com/) service.
 
 ## Example API Usage
-API endpoint: https://ibbus93--nutritional-rag-service-nutritionalragservice-g-98e082.modal.run
-
 Send a POST request to the API endpoint with a JSON body:
 
 ```json
@@ -36,6 +34,10 @@ Send a POST request to the API endpoint with a JSON body:
   "description": "cheddar cheese"
 }
 ```
+
+API endpoints: 
+- LLama: https://ibbus93--nutritional-rag-service-llama-nutritionalragser-fc918b.modal.run
+- Qwen: https://ibbus93--nutritional-rag-service-qwen-nutritionalragserv-7ae00e.modal.run
 
 Response:
 ```json
@@ -51,7 +53,7 @@ Response:
 
 Curl example:
 ```bash
-curl --location 'https://ibbus93--nutritional-rag-service-nutritionalragservice-g-98e082.modal.run' \
+curl --location 'https://ibbus93--nutritional-rag-service-llama-nutritionalragser-fc918b.modal.run' \
 --header 'Content-Type: application/json' \
 --data '{
     "description": "Cheddar cheese"

@@ -2,7 +2,7 @@ import modal
 from modal import App, Volume, Image
 # Setup - define our infrastructure with code!
 
-app = modal.App("nutritional-rag-service")
+app = modal.App("nutritional-rag-service-llama")
 secrets = [modal.Secret.from_name("hf-secret"), modal.Secret.from_name("mongodb-secret")]
 
 image = Image.debian_slim().pip_install(
