@@ -8,3 +8,6 @@ pymongo
 openai
 transformers
 python-dotenv
+torch
+lm-format-enforcer
+optimum
