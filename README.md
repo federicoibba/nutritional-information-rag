@@ -2,6 +2,22 @@
 
 This project provides a Retrieval-Augmented Generation (RAG) service to extract nutritional information for food items using both OpenAI and open-source models, including Qwen and Llama. The workflow is organized in a series of Jupyter notebooks, modular Python services, and a final deployable API service.
 
+## How to run
+First of all, setup your environment installing all the needed dependencies. If you use Anaconda:
+```bash
+conda env create -f environment.yml
+conda activate nutritional-rag-env
+```
+
+Using pip:
+```bash
+pip install -r requirements.txt
+```
+
+If you are interested on locally testing either the notebooks or the services, please refer to:
+- [Notebooks documentation](./notebooks/README.md)
+- [Services documentation](./services/README.md)
+
 ## Project Structure
 
 - `datasets/food.csv` and `datasets/food_dataset.csv`: Raw and processed food nutrition datasets used as the data source for the project.
