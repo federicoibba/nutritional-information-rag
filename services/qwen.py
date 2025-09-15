@@ -128,7 +128,7 @@ class NutritionalRagService:
         prefix_function = build_transformers_prefix_allowed_tokens_fn(self.hf_pipeline.tokenizer, parser)
 
         # Call the pipeline with the prefix function
-        output_dict = self.hf_pipeline(prompt, prefix_allowed_tokens_fn=prefix_function) #, max_new_tokens=100)
+        output_dict = self.hf_pipeline(prompt, prefix_allowed_tokens_fn=prefix_function)
 
         # Extract the results
         result = output_dict[0]['generated_text'][len(prompt):].replace('\n', '')

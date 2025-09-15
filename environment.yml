@@ -1,0 +1,24 @@
+name: nutritional-rag-env
+channels:
+  - defaults
+  - conda-forge
+dependencies:
+  - python=3.11
+  - pandas
+  - jupyterlab
+  - ipywidgets
+  - huggingface_hub
+  - tqdm
+  - langchain
+  - langchain-community
+  - sentence-transformers
+  - pymongo
+  - openai
+  - transformers
+  - python-dotenv
+  - pytorch
+  - pip
+  - pip:
+      - lm-format-enforcer
+      - optimum
+      - modal
