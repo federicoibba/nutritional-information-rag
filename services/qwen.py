@@ -1,14 +1,13 @@
 import modal
 from modal import App, Volume, Image
 from pydantic import BaseModel
-# Setup - define our infrastructure with code!
 
 app = modal.App("nutritional-rag-service-qwen")
 secrets = [modal.Secret.from_name("hf-secret"), modal.Secret.from_name("mongodb-secret")]
-
 image = Image.debian_slim().pip_install(
     "huggingface", "pymongo", "sentence_transformers", "transformers", "accelerate", "fastapi[standard]", "torch", "lm-format-enforcer", "optimum", "outlines", "bitsandbytes"
 )
+
 ## Modal settings
 GPU = "T4"
 CACHE_DIR = "/cache"
@@ -23,7 +22,7 @@ FOOD_DB_ITEMS = 3
 
 hf_cache_volume = Volume.from_name("hf-hub-cache", create_if_missing=True)
 
-class AnswerFormat(BaseModel):
+class Food(BaseModel):
     protein: float
     carbohydrates: float
     fats: float
@@ -76,7 +75,7 @@ class NutritionalRagService:
             AutoTokenizer.from_pretrained(BASE_MODEL),
         )
 
-        self.generator = Generator(model, AnswerFormat)
+        self.generator = Generator(model, Food)
 
         print(f"""Model {BASE_MODEL} loaded""")
 

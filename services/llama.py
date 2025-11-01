@@ -1,24 +1,35 @@
 import modal
 from modal import App, Volume, Image
-# Setup - define our infrastructure with code!
+from pydantic import BaseModel
 
-app = modal.App("nutritional-rag-service-llama")
+app = modal.App("nutritional-rag-service-qwen")
 secrets = [modal.Secret.from_name("hf-secret"), modal.Secret.from_name("mongodb-secret")]
-
 image = Image.debian_slim().pip_install(
-    "huggingface", "pymongo", "sentence_transformers", "transformers", "accelerate", "fastapi[standard]"
+    "huggingface", "pymongo", "sentence_transformers", "transformers", "accelerate", "fastapi[standard]", "torch", "lm-format-enforcer", "optimum", "outlines", "bitsandbytes"
+
 )
 
-# Constants
+## Modal settings
 GPU = "T4"
-BASE_MODEL = "meta-llama/Llama-3.2-1B-Instruct"
-SENTENCE_TRANSFORMER_MODEL = 'sentence-transformers/all-MiniLM-L6-v2'
 CACHE_DIR = "/cache"
-
 # Change this to 1 if you want Modal to be always running, otherwise it will go cold after 2 mins
 MIN_CONTAINERS = 0
 
+# Application Constants
+BASE_MODEL = "meta-llama/Llama-3.2-1B-Instruct"
+SENTENCE_TRANSFORMER_MODEL = 'sentence-transformers/all-MiniLM-L6-v2'
+FOOD_DB_ITEMS = 3
+
+
 hf_cache_volume = Volume.from_name("hf-hub-cache", create_if_missing=True)
+
+class Food(BaseModel):
+    protein: float
+    carbohydrates: float
+    fats: float
+    calories: float
+    sugar: float
+    fiber: float
 
 @app.cls(
     image=image.env({"HF_HUB_CACHE": CACHE_DIR}),
@@ -52,25 +63,20 @@ class NutritionalRagService:
         print("Connected to MongoDB")
     
     def init_model(self):
-        from transformers import AutoModelForCausalLM, AutoTokenizer
-        import torch
+        from outlines import Generator, from_transformers
+        from transformers import AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig
 
         print("Loading model...")
 
-        # Load model and tokenizer
-        self.tokenizer = AutoTokenizer.from_pretrained(
-            BASE_MODEL, 
-            cache_dir=CACHE_DIR,
-            device_map="auto"    
-        )
-        self.tokenizer.pad_token = self.tokenizer.eos_token
-        self.tokenizer.padding_side = "right"
+        quantization_config = BitsAndBytesConfig(load_in_4bit=True)
+        quantized_model = AutoModelForCausalLM.from_pretrained(BASE_MODEL, device_map="auto", quantization_config=quantization_config)
 
-        self.model = AutoModelForCausalLM.from_pretrained(
-            BASE_MODEL, 
-            cache_dir=CACHE_DIR, 
-            device_map="auto"
+        model = from_transformers(
+            quantized_model,
+            AutoTokenizer.from_pretrained(BASE_MODEL),
         )
+
+        self.generator = Generator(model, Food)
 
         print(f"""Model {BASE_MODEL} loaded""")
 
@@ -95,7 +101,7 @@ class NutritionalRagService:
                     "queryVector": query_embedding,
                     "path": "embedding",
                     "exact": True,
-                    "limit": 3
+                    "limit": FOOD_DB_ITEMS
                 }
             }, 
             {
@@ -113,48 +119,27 @@ class NutritionalRagService:
 
         return array_of_results
 
-    def get_json(self, text):
-        import json
-        import re
-
-        # Find the starting position of the first JSON object
-        start_of_json = text.find('{')
-        
-        if start_of_json != -1:
-            # Use a regular expression to find the full JSON object
-            # This pattern looks for a JSON-like structure enclosed in curly braces
-            # with a closing brace `}` that isn't a part of an inner structure.
-            # The `re.DOTALL` flag is used to match newlines as well.
-            match = re.search(r'\{[^{}]*?\}', text[start_of_json:], re.DOTALL)
-            
-            if match:
-                json_str = match.group(0)
-                try:
-                    # Parse the extracted string into a Python dictionary
-                    return json.loads(json_str)
-                except json.JSONDecodeError as e:
-                    print(f"Error decoding JSON: {e}")
-            else:
-                print("No valid JSON structure found.")
-        else:
-            print("No JSON object found in the text.")
-
     @modal.fastapi_endpoint(method="POST")
     def get_nutritional_data(self, item: dict):
-        import torch
+        import json
 
         food = item['description']
 
         context = self.get_query_results(food)
-        context_string = " - ".join([doc["text"] for doc in context])
-        prompt = f"""Get the nutritional data of the following food ingredient: {food}. 
-        Answer the question based only on the following context: {context_string}
-        Reply only with a JSON that contains the following data: protein, carbohydrates, fats, calories, sugars, fibers. 
+        context_string = " \n ".join([doc["text"] for doc in reversed(context)])
+        prompt = f"""
+            Please use only the following context to answer the question.
+            **Precedence Rule: Always choose the nutritional data for RAW foods if available.**
+
+            Get the nutritional data of the following food ingredient: **{food}**.
+            CONTEXT OPTIONS:
+            {context_string}
         """
 
-        input_ids = self.tokenizer.encode(prompt, return_tensors="pt", truncation='do_not_truncate').to("cuda")
-        attention_mask = torch.ones(input_ids.shape, device="cuda")
-        outputs = self.model.generate(input_ids, attention_mask=attention_mask, max_new_tokens=100)
-        decoded_output = self.tokenizer.decode(outputs[0]).replace('\n', '')
+        print("Generated prompt:", prompt)
 
-        return self.get_json(decoded_output)
+        # Extract the results
+        return json.loads(self.generator(
+            prompt,
+            max_new_tokens=200,
+        ))

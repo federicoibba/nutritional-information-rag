@@ -2,11 +2,9 @@ import modal
 from modal import App, Volume, Image
 from fastapi import Request, HTTPException
 from pydantic import BaseModel
-# Setup - define our infrastructure with code!
 
 app = modal.App("nutritional-rag-service-openai")
 secrets = [modal.Secret.from_name("hf-secret"), modal.Secret.from_name("mongodb-secret")]
-
 image = Image.debian_slim().pip_install(
     "huggingface", "pymongo", "sentence_transformers", "transformers", "accelerate", "fastapi[standard]", "torch", "lm-format-enforcer", "optimum", "openai"
 )
@@ -22,7 +20,7 @@ MIN_CONTAINERS = 0
 
 hf_cache_volume = Volume.from_name("hf-hub-cache", create_if_missing=True)
 
-class AnswerFormat(BaseModel):
+class Food(BaseModel):
     protein: float
     carbohydrates: float
     fats: float
