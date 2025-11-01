@@ -7,17 +7,19 @@ app = modal.App("nutritional-rag-service-qwen")
 secrets = [modal.Secret.from_name("hf-secret"), modal.Secret.from_name("mongodb-secret")]
 
 image = Image.debian_slim().pip_install(
-    "huggingface", "pymongo", "sentence_transformers", "transformers", "accelerate", "fastapi[standard]", "torch", "lm-format-enforcer", "optimum"
+    "huggingface", "pymongo", "sentence_transformers", "transformers", "accelerate", "fastapi[standard]", "torch", "lm-format-enforcer", "optimum", "outlines", "bitsandbytes"
 )
-
-# Constants
+## Modal settings
 GPU = "T4"
-BASE_MODEL = "Qwen/Qwen2.5-3B-Instruct"
-SENTENCE_TRANSFORMER_MODEL = 'sentence-transformers/all-MiniLM-L6-v2'
 CACHE_DIR = "/cache"
-
 # Change this to 1 if you want Modal to be always running, otherwise it will go cold after 2 mins
 MIN_CONTAINERS = 0
+
+# Application Constants
+BASE_MODEL = "qwen/Qwen2.5-7B-Instruct"
+SENTENCE_TRANSFORMER_MODEL = 'sentence-transformers/all-MiniLM-L6-v2'
+FOOD_DB_ITEMS = 3
+
 
 hf_cache_volume = Volume.from_name("hf-hub-cache", create_if_missing=True)
 
@@ -61,11 +63,20 @@ class NutritionalRagService:
         print("Connected to MongoDB")
     
     def init_model(self):
-        from transformers import pipeline
+        from outlines import Generator, from_transformers
+        from transformers import AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig
 
         print("Loading model...")
 
-        self.hf_pipeline = pipeline('text-generation', model=BASE_MODEL, device_map='auto')
+        quantization_config = BitsAndBytesConfig(load_in_4bit=True)
+        quantized_model = AutoModelForCausalLM.from_pretrained(BASE_MODEL, device_map="auto", quantization_config=quantization_config)
+
+        model = from_transformers(
+            quantized_model,
+            AutoTokenizer.from_pretrained(BASE_MODEL),
+        )
+
+        self.generator = Generator(model, AnswerFormat)
 
         print(f"""Model {BASE_MODEL} loaded""")
 
@@ -90,7 +101,7 @@ class NutritionalRagService:
                     "queryVector": query_embedding,
                     "path": "embedding",
                     "exact": True,
-                    "limit": 5
+                    "limit": FOOD_DB_ITEMS
                 }
             }, 
             {
@@ -111,26 +122,24 @@ class NutritionalRagService:
     @modal.fastapi_endpoint(method="POST")
     def get_nutritional_data(self, item: dict):
         import json
-        from lmformatenforcer import JsonSchemaParser
-        from lmformatenforcer.integrations.transformers import build_transformers_prefix_allowed_tokens_fn
 
         food = item['description']
 
         context = self.get_query_results(food)
-        context_string = " - ".join([doc["text"] for doc in context])
-        prompt = f"""Get the nutritional data of the following food ingredient: {food}. 
-        Answer the question based only on the following context: {context_string}
-        Reply only with a JSON that contains the following data: protein, carbohydrates, fats, calories, sugars, fibers. 
+        context_string = " \n ".join([doc["text"] for doc in context])
+        prompt = f"""
+            Please use only the following context to answer the question.
+            **Precedence Rule: Always choose the nutritional data for RAW foods if available.**
+
+            Get the nutritional data of the following food ingredient: **{food}**.
+            CONTEXT OPTIONS:
+            {context_string}
         """
 
-        # Create a character level parser and build a transformers prefix function from it
-        parser = JsonSchemaParser(AnswerFormat.model_json_schema())
-        prefix_function = build_transformers_prefix_allowed_tokens_fn(self.hf_pipeline.tokenizer, parser)
-
-        # Call the pipeline with the prefix function
-        output_dict = self.hf_pipeline(prompt, prefix_allowed_tokens_fn=prefix_function)
+        print("Generated prompt:", prompt)
 
         # Extract the results
-        result = output_dict[0]['generated_text'][len(prompt):].replace('\n', '')
-
-        return json.loads(result)
+        return json.loads(self.generator(
+            prompt,
+            max_new_tokens=200,
+        ))

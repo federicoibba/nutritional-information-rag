@@ -18,6 +18,8 @@ dependencies:
   - python-dotenv
   - pytorch
   - pip
+  - bitsandbytes
+  - accelerate
   - pip:
       - lm-format-enforcer
       - optimum
