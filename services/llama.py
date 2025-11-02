@@ -68,11 +68,10 @@ class NutritionalRagService:
 
         print("Loading model...")
 
-        quantization_config = BitsAndBytesConfig(load_in_4bit=True)
-        quantized_model = AutoModelForCausalLM.from_pretrained(BASE_MODEL, device_map="auto", quantization_config=quantization_config)
+        base_model = AutoModelForCausalLM.from_pretrained(BASE_MODEL, device_map="auto")
 
         model = from_transformers(
-            quantized_model,
+            base_model,
             AutoTokenizer.from_pretrained(BASE_MODEL),
         )
 
